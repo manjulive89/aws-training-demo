@@ -43,5 +43,8 @@ jobs:
       - name: Copy function jar to S3 bucket
         run: aws s3 cp ./s3-lambda/target/s3-lambda-0.0.1-SNAPSHOT.jar s3://${{ env.S3_JAR_BUCKET_NAME }}/s3-lambda-$GITHUB_SHA-$NOW.jar
 
+      - name: Copy stack template to S3 bucket
+        run: aws s3 cp ./stack-template.json s3://${{ env.S3_JAR_BUCKET_NAME }}/stack-template.json
+
       - name: Print that finished
         run: echo 'Finished successfully'

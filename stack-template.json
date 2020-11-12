@@ -1,0 +1,304 @@
+{
+  "Resources": {
+    "DynamoDbBookTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "isbn",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "isbn",
+            "KeyType": "HASH"
+          }
+        ],
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 5,
+          "WriteCapacityUnits": 5
+        },
+        "TableName": "book"
+      }
+    },
+    "SqsBookEventQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "FifoQueue": true,
+        "QueueName": "book-event.fifo"
+      }
+    },
+    "S3BookEventBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": "book-bucket-demo",
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        }
+      }
+    },
+    "DynamoDbAndSqsBookDemoRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "DynamoDbBookTableDemoPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:PutItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:Scan"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "DynamoDbBookTable",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "SqsBookEventQueueDemoPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:GetQueueUrl",
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "SqsBookEventQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "S3AppJarDemoPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:*",
+                  "Resource": "arn:aws:s3:::app-jar-bucket-demo/*"
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": "DynamoDbAndSqsBookDemoRole"
+      }
+    },
+    "InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "DynamoDbAndSqsBookDemoRole"
+          }
+        ]
+      }
+    },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": "launch-wizard-demo",
+        "GroupDescription": "Some meaningful description =)",
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 22,
+            "ToPort": 22
+          },
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": "0.0.0.0/0",
+            "FromPort": 8080,
+            "ToPort": 8080
+          },
+          {
+            "IpProtocol": "tcp",
+            "CidrIpv6": "::/0",
+            "FromPort": 8080,
+            "ToPort": 8080
+          }
+        ]
+      }
+    },
+    "Ec2ForBookApp": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "IamInstanceProfile": {
+          "Ref": "InstanceProfile"
+        },
+        "ImageId": "ami-03657b56516ab7912",
+        "InstanceType": "t2.micro",
+        "KeyName": "demo",
+        "SecurityGroups": [
+          {
+            "Ref": "SecurityGroup"
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": "#!/bin/bash\nsudo amazon-linux-extras install java-openjdk11\naws s3 cp s3://app-jar-bucket-demo/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar dynamodb-sqs-app-0.0.1-SNAPSHOT.jar\nnohup java -jar dynamodb-sqs-app-0.0.1-SNAPSHOT.jar > log.txt 2>&1 &"
+        }
+      },
+      "DependsOn": [
+        "DynamoDbBookTable",
+        "SqsBookEventQueue"
+      ]
+    },
+    "LambdaBookDemoRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "SqsTriggerBookEventDemoPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:DeleteMessage",
+                    "sqs:ReceiveMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "SqsBookEventQueue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "S3BookDemoPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:*",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:s3:::",
+                        {
+                          "Ref": "S3BookEventBucket"
+                        },
+                        "/*"
+                      ]
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "RoleName": "LambdaBookDemoRole"
+      }
+    },
+    "LambdaBookEventFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "app-jar-bucket-demo",
+          "S3Key": "s3-lambda-0.0.1-SNAPSHOT.jar"
+        },
+        "FunctionName": "function-book-from-sqs-to-s3-demo",
+        "Handler": "com.epam.training.BookEventHandler::handleRequest",
+        "MemorySize": 256,
+        "Role": {
+          "Fn::GetAtt": [
+            "LambdaBookDemoRole",
+            "Arn"
+          ]
+        },
+        "Runtime": "java11",
+        "Timeout": 15
+      },
+      "DependsOn": [
+        "SqsBookEventQueue",
+        "S3BookEventBucket"
+      ]
+    },
+    "LambdaBookEventTrigger": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "Enabled": true,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "SqsBookEventQueue",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "LambdaBookEventFunction",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "LambdaBookEventFunction"
+      ]
+    }
+  }
+}
