@@ -1,0 +1,41 @@
+name: AWS Deploy
+
+env:
+  AWS_REGION_NAME: 'us-east-2'
+  S3_JAR_BUCKET_NAME: 'app-jar-bucket-demo'
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: 'AWS Region'
+        required: true
+        default: 'us-east-2'
+
+jobs:
+  aws-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: '11'
+
+      - name: Build with Maven
+        run: mvn clean package
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION_NAME }}
+
+      - name: Copy Deployment package to S3 bucket
+        run: aws s3 rm s3://${{ env.S3_JAR_BUCKET_NAME }}/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar && aws s3 cp "./dynamodb-sqs-app/target/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar" s3://${{ env.S3_JAR_BUCKET_NAME }}/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar
+
+      - name: Print that finished
+        run: echo 'Finished successfully'
