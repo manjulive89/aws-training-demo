@@ -25,7 +25,7 @@ jobs:
           aws-region: 'us-east-2'
 
       - name: Set current date as env variable
-        run: echo "::set-env name=NOW::$(date +'%Y-%m-%dT%H-%M-%S')"
+        run: echo "NOW=$(date +'%Y-%m-%dT%H-%M-%S')" >> $GITHUB_ENV
 
       - name: Copy app jar to S3 bucket
         run: aws s3 cp ./dynamodb-sqs-app/target/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar s3://app-jar-bucket-demo/dynamodb-sqs-app-$GITHUB_SHA-$NOW.jar
