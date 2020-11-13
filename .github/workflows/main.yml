@@ -35,14 +35,14 @@ jobs:
 
       - name: Copy stack template to S3 bucket
         run: |
-          aws s3 rm s3://app-jar-bucket-demo/stack/template.json \
-          && aws s3 cp ./stack-template.json s3://app-jar-bucket-demo/stack/template.json
+          aws s3 rm s3://app-jar-bucket-demo/stack-template.json \
+          && aws s3 cp ./stack-template.json s3://app-jar-bucket-demo/stack-template.json
 
       - name: Deploy stack
         run: |
           aws cloudformation deploy \
           --stack-name training-demo-stack \
-          --template-file template.json \
+          --template-file stack-template.json \
           --s3-bucket app-jar-bucket-demo \
           --capabilities CAPABILITY_NAMED_IAM \
           --parameter-overrides  JarVersion=$GITHUB_SHA-$NOW \
