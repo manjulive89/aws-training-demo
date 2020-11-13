@@ -183,14 +183,22 @@
             "Fn::Join": [
               "",
               [
-                "!/bin/bash\n",
+                "#!/bin/bash\n",
                 "sudo amazon-linux-extras install java-openjdk11\n",
                 "aws s3 cp s3://app-jar-bucket-demo/dynamodb-sqs-app-",
                 {
                   "Ref": "JarVersion"
                 },
-                ".jar dynamodb-sqs-app.jar\n",
-                "nohup java -jar dynamodb-sqs-app.jar > log.txt 2>&1 &"
+                ".jar dynamodb-sqs-app-",
+                {
+                  "Ref": "JarVersion"
+                },
+                ".jar\n",
+                "nohup java -jar dynamodb-sqs-app-",
+                {
+                  "Ref": "JarVersion"
+                },
+                ".jar > log.txt 2>&1 &"
               ]
             ]
           }
