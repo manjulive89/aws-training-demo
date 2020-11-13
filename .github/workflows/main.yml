@@ -1,16 +1,6 @@
 name: AWS Deploy
 
-env:
-  AWS_REGION_NAME: 'us-east-2'
-  S3_JAR_BUCKET_NAME: 'app-jar-bucket-demo'
-
-on:
-  workflow_dispatch:
-    inputs:
-      region:
-        description: 'AWS Region'
-        required: true
-        default: 'us-east-2'
+on: workflow_dispatch
 
 jobs:
   aws-deploy:
@@ -32,19 +22,29 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION_NAME }}
+          aws-region: 'us-east-2'
 
       - name: Set current date as env variable
         run: echo "::set-env name=NOW::$(date +'%Y-%m-%dT%H-%M-%S')"
 
       - name: Copy app jar to S3 bucket
-        run: aws s3 cp ./dynamodb-sqs-app/target/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar s3://${{ env.S3_JAR_BUCKET_NAME }}/dynamodb-sqs-app-$GITHUB_SHA-$NOW.jar
+        run: aws s3 cp ./dynamodb-sqs-app/target/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar s3://app-jar-bucket-demo/dynamodb-sqs-app-$GITHUB_SHA-$NOW.jar
 
       - name: Copy function jar to S3 bucket
-        run: aws s3 cp ./s3-lambda/target/s3-lambda-0.0.1-SNAPSHOT.jar s3://${{ env.S3_JAR_BUCKET_NAME }}/s3-lambda-$GITHUB_SHA-$NOW.jar
+        run: aws s3 cp ./s3-lambda/target/s3-lambda-0.0.1-SNAPSHOT.jar s3://app-jar-bucket-demo/s3-lambda-$GITHUB_SHA-$NOW.jar
 
       - name: Copy stack template to S3 bucket
-        run: aws s3 cp ./stack-template.json s3://${{ env.S3_JAR_BUCKET_NAME }}/stack-template.json
+        run: |
+          aws s3 rm ./stack-template.json s3://app-jar-bucket-demo/stack/template.json \
+          && aws s3 cp ./stack-template.json s3://app-jar-bucket-demo/stack/template.json
 
-      - name: Print that finished
-        run: echo 'Finished successfully'
+      - name: Deploy stack
+        run: |
+          aws cloudformation deploy \
+          --stack-name training-demo-stack \
+          --template-file /stack/template.json \
+          --s3-bucket app-jar-bucket-demo \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --parameter-overrides  JarVersion=$GITHUB_SHA-$NOW \
+          --no-fail-on-empty-changeset \
+          --s3-prefix stack

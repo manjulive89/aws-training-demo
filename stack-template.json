@@ -1,4 +1,9 @@
 {
+  "Parameters": {
+    "JarVersion": {
+      "Type": "String"
+    }
+  },
   "Resources": {
     "DynamoDbBookTable": {
       "Type": "AWS::DynamoDB::Table",
@@ -174,7 +179,21 @@
           }
         ],
         "UserData": {
-          "Fn::Base64": "#!/bin/bash\nsudo amazon-linux-extras install java-openjdk11\naws s3 cp s3://app-jar-bucket-demo/dynamodb-sqs-app-0.0.1-SNAPSHOT.jar dynamodb-sqs-app-0.0.1-SNAPSHOT.jar\nnohup java -jar dynamodb-sqs-app-0.0.1-SNAPSHOT.jar > log.txt 2>&1 &"
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "!/bin/bash\n",
+                "sudo amazon-linux-extras install java-openjdk11\n",
+                "aws s3 cp s3://app-jar-bucket-demo/dynamodb-sqs-app-",
+                {
+                  "Ref": "JarVersion"
+                },
+                ".jar dynamodb-sqs-app.jar\n",
+                "nohup java -jar dynamodb-sqs-app.jar > log.txt 2>&1 &"
+              ]
+            ]
+          }
         }
       },
       "DependsOn": [
@@ -260,7 +279,18 @@
       "Properties": {
         "Code": {
           "S3Bucket": "app-jar-bucket-demo",
-          "S3Key": "s3-lambda-0.0.1-SNAPSHOT.jar"
+          "S3Key": {
+            "Fn::Join": [
+              "",
+              [
+                "s3-lambda-",
+                {
+                  "Ref": "JarVersion"
+                },
+                ".jar"
+              ]
+            ]
+          }
         },
         "FunctionName": "function-book-from-sqs-to-s3-demo",
         "Handler": "com.epam.training.BookEventHandler::handleRequest",
